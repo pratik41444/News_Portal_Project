@@ -10,8 +10,9 @@
 // - Interactive event handling (click-triggered ad displays)
 // ============================================================================
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import NewsCard from './components/NewsCard';
+import useAdTrigger from './hooks/useAdTrigger';
 
 // ============================================================================
 // CONTENT DATA STRUCTURES
@@ -227,11 +228,6 @@ function App() {
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
   const [adModal, setAdModal] = useState(null);
   
-  // INTERACTION TRACKING: Counts user clicks to trigger ads at intervals
-  const [clickCount, setClickCount] = useState(0);
-  // Randomly decides whether next ad trigger is at 5 or 6 clicks
-  const [nextAdTrigger, setNextAdTrigger] = useState(() => (Math.random() < 0.5 ? 5 : 6));
-  
   // FEEDBACK MESSAGE: Displays auth success/error messages to user
   const [message, setMessage] = useState('');
 
@@ -272,10 +268,12 @@ function App() {
    * openRandomAd - Selects and displays a random ad from the library
    * Used when ad trigger threshold is reached
    */
-  const openRandomAd = () => {
+  const openRandomAd = useCallback(() => {
     const ad = adLibrary[Math.floor(Math.random() * adLibrary.length)];
     setAdModal(ad);
-  };
+  }, []);
+
+  const { registerInteraction, resetCounter } = useAdTrigger(openRandomAd);
 
   // ========================================================================
   // INTERACTION & CLICK HANDLING
@@ -308,19 +306,7 @@ function App() {
       return;
     }
 
-    // Increment click counter and check if ad trigger threshold reached
-    setClickCount((previousCount) => {
-      const nextCount = previousCount + 1;
-
-      // Trigger ad display at random intervals (5 or 6 clicks)
-      if (nextCount >= nextAdTrigger) {
-        openRandomAd();
-        setNextAdTrigger(Math.random() < 0.5 ? 5 : 6);
-        return 0; // Reset counter
-      }
-
-      return nextCount;
-    });
+    registerInteraction();
   };
 
   // ========================================================================
@@ -398,8 +384,7 @@ function App() {
     setAdminForm(adminLoginDefaults);
     setShowAuthPrompt(false);
     setAdModal(null);
-    setClickCount(0);
-    setNextAdTrigger(Math.random() < 0.5 ? 5 : 6);
+    resetCounter();
   };
 
   /**
@@ -407,6 +392,7 @@ function App() {
    */
   const closeAdModal = () => {
     setAdModal(null);
+    resetCounter();
   };
 
   // ========================================================================
