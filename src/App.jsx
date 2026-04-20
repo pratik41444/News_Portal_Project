@@ -1,12 +1,30 @@
+// ============================================================================
+// App.jsx - Main Application Component
+// ============================================================================
+// This is the root React component for the news portal application.
+// It manages:
+// - User authentication (login/logout, role-based access)
+// - Screen/page state navigation (home, auth, admin views)
+// - Content display (hero stories, featured articles, trending cards)
+// - Modal interactions (auth prompts, ad placements)
+// - Interactive event handling (click-triggered ad displays)
+// ============================================================================
+
 import { useMemo, useState } from 'react';
 import NewsCard from './components/NewsCard';
 
+// ============================================================================
+// CONTENT DATA STRUCTURES
+// ============================================================================
+
+// Breaking news ticker items displayed in the header
 const tickerItems = [
   'Global Summit addresses climate crisis in urgent session...',
   'Market indices reach historic high following tech breakthrough...',
   'New archaeological discovery rewrites early trade history...',
 ];
 
+// Main hero story object displayed prominently on the homepage
 const heroStory = {
   tag: 'World News',
   title:
@@ -16,6 +34,7 @@ const heroStory = {
   imageClass: 'hero-visual',
 };
 
+// Featured stories displayed in the sidebar
 const featuredSideStories = [
   {
     id: 1,
@@ -23,7 +42,7 @@ const featuredSideStories = [
     title: 'The Silicon Valley Pivot: Why AI is Swallowing SaaS',
     excerpt:
       'Industry giants are restructuring entire divisions as LLMs become the core interface of modern software.',
-    tone: 'blue',
+    tone: 'blue', // CSS class for styling/color theme
     tag: 'Featured',
   },
   {
@@ -37,6 +56,7 @@ const featuredSideStories = [
   },
 ];
 
+// Trending articles displayed in the main grid section
 const trendingStories = [
   {
     id: 1,
@@ -80,6 +100,12 @@ const trendingStories = [
   },
 ];
 
+// ============================================================================
+// AUTHENTICATION & FORM DATA
+// ============================================================================
+
+// Hardcoded valid user credentials for demo purposes
+// In production, this would come from a backend API with secure hashing
 const allowedLogin = {
   firstName: 'sandhya',
   lastName: 'tiwari',
@@ -88,25 +114,32 @@ const allowedLogin = {
   role: 'user',
 };
 
+// Initial empty state for the user login form
 const loginFormDefaults = {
   firstName: '',
   lastName: '',
   email: '',
   password: '',
-  role: '',
 };
 
+// Initial state for the signup form
 const signupFormDefaults = {
   name: 'Sandhya Tiwari',
   email: 'sandhya@gmail.com',
   password: 'password123',
 };
 
+// Initial state for admin login form
 const adminLoginDefaults = {
   username: '',
   password: '',
 };
 
+// ============================================================================
+// ADMIN DASHBOARD DATA
+// ============================================================================
+
+// Key metrics displayed in admin dashboard
 const adminHighlights = [
   {
     label: 'Pending Reviews',
@@ -125,6 +158,7 @@ const adminHighlights = [
   },
 ];
 
+// Tasks in the admin editorial review queue
 const adminQueue = [
   {
     id: 1,
@@ -143,6 +177,7 @@ const adminQueue = [
   },
 ];
 
+// Library of sponsored ads that appear randomly during user interactions
 const adLibrary = [
   {
     label: 'Sponsored Insight',
@@ -167,107 +202,193 @@ const adLibrary = [
   },
 ];
 
+// Demo user role for display purposes
 const demoRole = 'user';
 
+// ============================================================================
+// MAIN APP COMPONENT
+// ============================================================================
 function App() {
+  // SCREEN STATE: Determines which view is rendered (home, auth, admin)
   const [screen, setScreen] = useState('home');
+  
+  // LOGIN STATE: Tracks whether user is authenticated
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  
+  // AUTH UI STATE: Tracks which auth tab is active (login, admin, signup)
   const [activeAuthTab, setActiveAuthTab] = useState('login');
+  
+  // FORM STATES: Store user input for login/admin/signup forms
   const [loginForm, setLoginForm] = useState(loginFormDefaults);
   const [signupForm, setSignupForm] = useState(signupFormDefaults);
   const [adminForm, setAdminForm] = useState(adminLoginDefaults);
+  
+  // MODAL STATES: Control visibility of auth and ad modals
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
   const [adModal, setAdModal] = useState(null);
+  
+  // INTERACTION TRACKING: Counts user clicks to trigger ads at intervals
   const [clickCount, setClickCount] = useState(0);
+  // Randomly decides whether next ad trigger is at 5 or 6 clicks
   const [nextAdTrigger, setNextAdTrigger] = useState(() => (Math.random() < 0.5 ? 5 : 6));
+  
+  // FEEDBACK MESSAGE: Displays auth success/error messages to user
   const [message, setMessage] = useState('');
 
+  // ========================================================================
+  // MEMOIZED / DERIVED VALUES
+  // ========================================================================
+  
+  // Concatenate ticker items into a single scrolling string with bullet separators
+  // useMemo prevents recalculation on every render unless tickerItems changes
   const breakingText = useMemo(() => tickerItems.join('   •   '), []);
+  
+  // Returns the current ad modal if one is active, otherwise null
+  // Used to conditionally render the ad display modal
   const adminVisibleAd = useMemo(() => {
     if (adModal) {
       return adModal;
     }
-
     return null;
   }, [adModal]);
 
+  // ========================================================================
+  // FORM HANDLING FUNCTIONS
+  // ========================================================================
+
+  /**
+   * updateForm - Generic form input handler factory
+   * Creates a handler function for a specific form state setter
+   * Updates form state with input name and value
+   * @param {function} setter - The state setter (e.g., setLoginForm)
+   * @returns {function} Event handler for input onChange events
+   */
   const updateForm = (setter) => (event) => {
     const { name, value } = event.target;
     setter((previous) => ({ ...previous, [name]: value }));
   };
 
+  /**
+   * openRandomAd - Selects and displays a random ad from the library
+   * Used when ad trigger threshold is reached
+   */
   const openRandomAd = () => {
     const ad = adLibrary[Math.floor(Math.random() * adLibrary.length)];
     setAdModal(ad);
   };
 
+  // ========================================================================
+  // INTERACTION & CLICK HANDLING
+  // ========================================================================
+
+  /**
+   * handleInteractiveClick - Manages user interactions on the homepage
+   * Behavior:
+   * - Only active when on home screen
+   * - If not logged in, shows auth prompt
+   * - If ad is currently open, does nothing
+   * - Otherwise, increments click counter
+   * - When counter reaches trigger threshold, displays a random ad
+   * - Resets counter and generates new random trigger after ad display
+   */
   const handleInteractiveClick = () => {
+    // Only track interactions on home screen
     if (screen !== 'home') {
       return;
     }
 
+    // Require login before allowing interactions
     if (!isLoggedIn) {
       setShowAuthPrompt(true);
       return;
     }
 
+    // Don't count clicks while ad is already open
     if (adModal) {
       return;
     }
 
+    // Increment click counter and check if ad trigger threshold reached
     setClickCount((previousCount) => {
       const nextCount = previousCount + 1;
 
+      // Trigger ad display at random intervals (5 or 6 clicks)
       if (nextCount >= nextAdTrigger) {
         openRandomAd();
         setNextAdTrigger(Math.random() < 0.5 ? 5 : 6);
-        return 0;
+        return 0; // Reset counter
       }
 
       return nextCount;
     });
   };
 
+  // ========================================================================
+  // AUTHENTICATION HANDLERS
+  // ========================================================================
+
+  /**
+   * handleLogin - Validates user credentials and logs in
+   * Checks all form fields against allowed credentials
+   * Updates UI state and messages accordingly
+   */
   const handleLogin = (event) => {
     event.preventDefault();
+    
+    // Validate all credential fields match allowed user
     const isAllowedUser =
       loginForm.firstName === allowedLogin.firstName &&
       loginForm.lastName === allowedLogin.lastName &&
       loginForm.email === allowedLogin.email &&
-      loginForm.password === allowedLogin.password &&
-      loginForm.role === allowedLogin.role;
+      loginForm.password === allowedLogin.password;
 
+    // Show error if credentials invalid
     if (!isAllowedUser) {
       setMessage('Invalid credentials. Please use the exact allowed login details.');
       return;
     }
 
+    // Successful login - update state and navigate to home
     setMessage('Login successful.');
     setIsLoggedIn(true);
     setScreen('home');
     setShowAuthPrompt(false);
   };
 
+  /**
+   * handleAdminLogin - Validates admin credentials and grants admin access
+   * Admin uses default demo credentials (admin / admin)
+   */
   const handleAdminLogin = (event) => {
     event.preventDefault();
 
+    // Check admin credentials (simple demo validation)
     if (adminForm.username !== 'admin' || adminForm.password !== 'admin') {
       setMessage('Invalid admin credentials. Use admin / admin to access the admin console.');
       return;
     }
 
+    // Grant admin access and navigate to admin panel
     setMessage('Admin access granted.');
     setIsLoggedIn(true);
     setScreen('admin');
     setShowAuthPrompt(false);
   };
 
+  /**
+   * handleSignup - Handles signup form submission
+   * Currently disabled in demo; shows message and reverts to login tab
+   */
   const handleSignup = (event) => {
     event.preventDefault();
     setMessage('Sign up is disabled for this demo. Please use the allowed login details.');
     setActiveAuthTab('login');
   };
 
+  /**
+   * handleLogout - Clears all session state and returns to auth screen
+   * Resets forms, modals, counters, and user state
+   */
   const handleLogout = () => {
     setIsLoggedIn(false);
     setScreen('auth');
@@ -281,10 +402,21 @@ function App() {
     setNextAdTrigger(Math.random() < 0.5 ? 5 : 6);
   };
 
+  /**
+   * closeAdModal - Closes the currently displayed ad modal
+   */
   const closeAdModal = () => {
     setAdModal(null);
   };
 
+  // ========================================================================
+  // RENDER FUNCTIONS
+  // ========================================================================
+
+  /**
+   * renderAuthPanel - Returns the authentication UI (login, signup, admin forms)
+   * Content changes based on activeAuthTab state
+   */
   const renderAuthPanel = () => (
     <>
       <div className="auth-panel-head">
@@ -366,19 +498,6 @@ function App() {
             <span className="field-link">Forgot Password?</span>
           </div>
 
-          <label htmlFor="login-role">Role</label>
-          <select
-            id="login-role"
-            name="role"
-            value={loginForm.role}
-            onChange={updateForm(setLoginForm)}
-            required
-          >
-            <option value="">Select role</option>
-            <option value="user">user</option>
-            <option value="admin">admin</option>
-          </select>
-
           <button type="submit" className="auth-button">
             Login <span aria-hidden="true">→</span>
           </button>
@@ -453,6 +572,13 @@ function App() {
     </>
   );
 
+  // ========================================================================
+  // CONDITIONAL RENDERING - SCREEN STATES
+  // ========================================================================
+
+  // SCREEN 1: Authentication Screen
+  // Rendered when user is not logged in or explicitly navigates to auth
+  // Displays login/signup forms and branded hero section
   if (screen === 'auth') {
     return (
       <div className="auth-page">
@@ -476,6 +602,9 @@ function App() {
     );
   }
 
+  // SCREEN 2: Admin Dashboard
+  // Displayed when admin user logs in
+  // Shows editorial review queue, metrics, and ad management tools
   if (screen === 'admin') {
     return (
       <div className="portal-shell admin-shell" onClickCapture={handleInteractiveClick}>
@@ -578,6 +707,10 @@ function App() {
     );
   }
 
+  // SCREEN 3: Home/Default Screen
+  // Main news portal view displayed to logged-in users
+  // Includes: breaking news ticker, hero article, featured stories, trending articles
+  // Click interactions trigger auth prompts (if not logged in) or ad displays
   return (
     <div className="portal-shell" onClickCapture={handleInteractiveClick}>
       <header className="site-header">
@@ -660,6 +793,7 @@ function App() {
         </section>
       </main>
 
+      {/* MODAL 1: Auth Prompt - Shows when non-logged-in user interacts with page */}
       {!isLoggedIn && showAuthPrompt ? (
         <div className="auth-modal-backdrop" role="presentation" onClick={() => setShowAuthPrompt(false)}>
           <section className="auth-modal-panel" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title" onClick={(event) => event.stopPropagation()}>
@@ -678,6 +812,7 @@ function App() {
         </div>
       ) : null}
 
+      {/* MODAL 2: Ad Display - Shows triggered ads after click threshold reached */}
       {isLoggedIn && adModal ? (
         <div className="ad-modal-backdrop" role="presentation" onClick={closeAdModal}>
           <article className={`ad-modal tone-${adModal.tone}`} role="dialog" aria-modal="true" aria-label={adModal.title} onClick={(event) => event.stopPropagation()}>
